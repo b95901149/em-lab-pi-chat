@@ -80,8 +80,15 @@ export default {
       const isQuota = err.status === 429 || /429|quota|TooManyRequests|rate limit/i.test(msg);
       const status = isQuota ? 429 : 500;
       const label = provider === "groq" ? "Groq" : "Gemini";
+      const retryAfterSeconds =
+        err.retryAfterSeconds ?? parseRetryAfterSeconds(null, msg) ?? undefined;
       const body = isQuota
-        ? { error: `${label} 免費配額已用完或觸發速率限制，請稍後再試。` }
+        ? {
+            error: retryAfterSeconds
+              ? `${label} 速率限制，請約 ${retryAfterSeconds} 秒後再試。`
+              : `${label} 免費配額已用完或觸發速率限制，請稍後再試。`,
+            ...(retryAfterSeconds != null ? { retryAfterSeconds } : {}),
+          }
         : { error: msg };
       return cors(json(body, status));
     }
@@ -111,6 +118,7 @@ function checkProviderConfig(env, provider) {
 
 async function callLlmWithRetry(body, env, provider, maxRetries = 3) {
   let delay = 600;
+  let lastRetryAfter = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await callLlm(body, env, provider);
@@ -118,8 +126,16 @@ async function callLlmWithRetry(body, env, provider, maxRetries = 3) {
       const isRate =
         err.status === 429 ||
         /429|rate limit|TooManyRequests|tokens per minute/i.test(err.message || "");
-      if (!isRate || attempt === maxRetries) throw err;
-      await sleep(delay);
+      if (err.retryAfterSeconds != null) {
+        lastRetryAfter = Math.max(lastRetryAfter || 0, err.retryAfterSeconds);
+      }
+      if (!isRate || attempt === maxRetries) {
+        if (lastRetryAfter != null) err.retryAfterSeconds = lastRetryAfter;
+        throw err;
+      }
+      const waitMs =
+        err.retryAfterSeconds != null ? err.retryAfterSeconds * 1000 : delay;
+      await sleep(waitMs);
       delay = Math.min(delay * 2, 8000);
     }
   }
@@ -168,13 +184,34 @@ async function callGroq(body, env) {
   if (!res.ok) {
     const msg = data?.error?.message || JSON.stringify(data);
     const err = new Error(msg);
-    if (res.status === 429) err.status = 429;
+    if (res.status === 429) {
+      err.status = 429;
+      err.retryAfterSeconds = parseRetryAfterSeconds(res, msg);
+    }
     throw err;
   }
 
   const text = (data?.choices?.[0]?.message?.content || "").trim();
   if (!text) throw new Error("Groq returned empty response");
   return text;
+}
+
+/** Parse Groq / OpenAI-style retry wait from headers or error message. */
+function parseRetryAfterSeconds(res, message = "") {
+  const hdr = res?.headers?.get?.("retry-after");
+  if (hdr) {
+    const n = parseFloat(hdr);
+    if (!Number.isNaN(n) && n > 0) return Math.ceil(n);
+  }
+
+  const m = String(message);
+  let match = m.match(/try again in\s+([\d.]+)\s*s(?:ec(?:ond)?s?)?/i);
+  if (match) return Math.ceil(parseFloat(match[1]));
+  match = m.match(/retry(?:\s+after)?\s+([\d.]+)\s*(?:s|sec(?:ond)?s?)?/i);
+  if (match) return Math.ceil(parseFloat(match[1]));
+  match = m.match(/wait\s+([\d.]+)\s*(?:s|sec(?:ond)?s?)/i);
+  if (match) return Math.ceil(parseFloat(match[1]));
+  return null;
 }
 
 async function callGemini(body, env) {

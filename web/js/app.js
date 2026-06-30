@@ -169,9 +169,15 @@ async function fetchChatWithBackoff(apiUrl, body) {
     const data = await res.json().catch(() => ({}));
 
     if (res.status === 429) {
-      const wait = Math.min(30000, baseMs * 2 ** attempt);
+      const retrySec =
+        typeof data.retryAfterSeconds === "number" && data.retryAfterSeconds > 0
+          ? Math.ceil(data.retryAfterSeconds)
+          : null;
+      const wait = retrySec ? retrySec * 1000 : Math.min(30000, baseMs * 2 ** attempt);
       backoffUntil = Date.now() + wait;
-      lastError = new Error(data.error || data.message || "HTTP 429");
+      const err = new Error(data.error || data.message || "HTTP 429");
+      err.retryAfterSeconds = retrySec;
+      lastError = err;
       if (attempt < maxRetries) {
         await sleep(wait);
         continue;
@@ -280,8 +286,13 @@ function appendMessage(role, content, extraClass = "") {
   return div;
 }
 
-function friendlyApiError(message = "") {
+function friendlyApiError(message = "", { retryAfterSeconds = null } = {}) {
   const m = String(message);
+  const waitSec =
+    retryAfterSeconds > 0
+      ? Math.ceil(retryAfterSeconds)
+      : parseRetryAfterFromMessage(m);
+
   if (/Failed to fetch|NetworkError|Load failed|fetch/i.test(m)) {
     return "⚠ 無法連線到 API。請確認 Worker 已啟動（wrangler dev --port 8787），並用 http://127.0.0.1:8769/ 開啟。";
   }
@@ -289,6 +300,13 @@ function friendlyApiError(message = "") {
     return "⚠ 請求逾時，請稍後再試。";
   }
   if (/429|quota|TooManyRequests|配額|rate limit|速率限制|tokens per minute/i.test(m)) {
+    if (waitSec) {
+      return (
+        `⚠ API 觸發速率限制（Groq）。\n` +
+        `請等待約 ${waitSec} 秒後再試。\n` +
+        "也可到 Groq 控制台查看 TPM 用量。"
+      );
+    }
     return (
       "⚠ API 免費配額已用完或觸發速率限制。\n" +
       "請稍後再試，或到 Groq / AI Studio 查看用量與金鑰設定。"
@@ -296,6 +314,15 @@ function friendlyApiError(message = "") {
   }
   if (m.length > 280) return `⚠ ${m.slice(0, 280)}…`;
   return m ? `⚠ ${m}` : "⚠ 伺服器未回傳內容，請稍後再試。";
+}
+
+function parseRetryAfterFromMessage(message = "") {
+  const m = String(message);
+  let match = m.match(/(?:約|等待約?|wait)\s*([\d.]+)\s*秒/i);
+  if (match) return Math.ceil(parseFloat(match[1]));
+  match = m.match(/try again in\s+([\d.]+)\s*s/i);
+  if (match) return Math.ceil(parseFloat(match[1]));
+  return null;
 }
 
 function showRefs(refs) {
@@ -422,7 +449,11 @@ async function sendMessage(text) {
     typing?.remove();
     const msg =
       err?.name === "AbortError" ? "請求逾時" : err.message || String(err);
-    appendMessage("assistant", friendlyApiError(msg), "error");
+    appendMessage(
+      "assistant",
+      friendlyApiError(msg, { retryAfterSeconds: err?.retryAfterSeconds }),
+      "error",
+    );
   } finally {
     busy = false;
     if (els.send) els.send.disabled = false;
