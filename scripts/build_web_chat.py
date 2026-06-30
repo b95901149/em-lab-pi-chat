@@ -92,11 +92,12 @@ def write_config(
     rag_enabled: bool = True,
 ) -> None:
     use_lite_rag = lite_rag or (lite and rag_enabled)
+    lite_chat = lite and not use_lite_rag
     config = {
         "apiUrl": api_url,
         "turnstileSiteKey": turnstile_site_key,
-        "maxHistoryTurns": 4 if use_lite_rag else 10,
-        "maxOutputTokens": 2048 if use_lite_rag else 4096,
+        "maxHistoryTurns": 3 if lite_chat else (4 if use_lite_rag else 10),
+        "maxOutputTokens": 2048 if (lite or use_lite_rag) else 4096,
         "ragTopK": 2 if use_lite_rag else 5,
         "ragMaxChunkChars": 350 if use_lite_rag else 600,
         "ragMaxContextChars": 900 if use_lite_rag else 3200,
@@ -107,8 +108,8 @@ def write_config(
         "ragLineBoost": 1.55 if use_lite_rag else 1.25,
         "ragTeachingDefault": False if use_lite_rag else True,
         "ragResearchDefault": False if use_lite_rag else True,
-        "minRequestIntervalMs": 2500 if use_lite_rag else 0,
-        "apiMaxRetries": 3 if use_lite_rag else 2,
+        "minRequestIntervalMs": 3000 if (lite_chat or use_lite_rag) else 0,
+        "apiMaxRetries": 0,
         "apiBackoffBaseMs": 1500 if use_lite_rag else 1000,
         "apiRequestTimeoutMs": 180000,
         "liteMode": lite,

@@ -145,56 +145,45 @@ function resolveRagHits(text) {
 }
 
 async function fetchChatWithBackoff(apiUrl, body) {
-  const maxRetries = config.apiMaxRetries ?? 2;
-  const baseMs = config.apiBackoffBaseMs ?? 1000;
   const minGap = config.minRequestIntervalMs ?? 0;
   const requestTimeoutMs = config.apiRequestTimeoutMs ?? 180000;
   const now = Date.now();
 
   if (now < backoffUntil) {
     const waitSec = Math.ceil((backoffUntil - now) / 1000);
-    throw new Error(`API 速率限制中，請 ${waitSec} 秒後再試`);
+    const err = new Error(`API 速率限制中，請 ${waitSec} 秒後再試`);
+    err.retryAfterSeconds = waitSec;
+    throw err;
   }
   if (minGap > 0 && now - lastRequestAt < minGap) {
     await sleep(minGap - (now - lastRequestAt));
   }
 
-  let lastError = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    lastRequestAt = Date.now();
-    const res = await fetchWithTimeout(apiUrl, requestTimeoutMs, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
+  lastRequestAt = Date.now();
+  const res = await fetchWithTimeout(apiUrl, requestTimeoutMs, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
 
-    if (res.status === 429) {
-      const retrySec =
-        typeof data.retryAfterSeconds === "number" && data.retryAfterSeconds > 0
-          ? Math.ceil(data.retryAfterSeconds)
-          : null;
-      const wait = retrySec ? retrySec * 1000 : Math.min(30000, baseMs * 2 ** attempt);
-      backoffUntil = Date.now() + wait;
-      const err = new Error(data.error || data.message || "HTTP 429");
-      err.retryAfterSeconds = retrySec;
-      lastError = err;
-      if (attempt < maxRetries) {
-        await sleep(wait);
-        continue;
-      }
-      throw lastError;
-    }
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || `HTTP ${res.status}`);
-    }
-
-    backoffUntil = 0;
-    return data;
+  if (res.status === 429) {
+    const retrySec =
+      typeof data.retryAfterSeconds === "number" && data.retryAfterSeconds > 0
+        ? Math.ceil(data.retryAfterSeconds)
+        : 45;
+    backoffUntil = Date.now() + retrySec * 1000;
+    const err = new Error(data.error || data.message || "HTTP 429");
+    err.retryAfterSeconds = retrySec;
+    throw err;
   }
 
-  throw lastError || new Error("API 請求失敗");
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `HTTP ${res.status}`);
+  }
+
+  backoffUntil = 0;
+  return data;
 }
 
 function ragContextLimits() {
@@ -407,6 +396,7 @@ async function sendMessage(text) {
   if (busy || !text.trim()) return;
   busy = true;
   let typing = null;
+  let typingTick = null;
   try {
     if (els.send) els.send.disabled = true;
     els.commandCenter?.classList.add("is-thinking");
@@ -415,6 +405,13 @@ async function sendMessage(text) {
     history.push({ role: "user", content: text.trim() });
 
     typing = appendMessage("assistant", "思考中…", "typing");
+    const started = Date.now();
+    typingTick = setInterval(() => {
+      if (!typing?.isConnected) return;
+      const sec = Math.floor((Date.now() - started) / 1000);
+      typing.textContent =
+        sec < 8 ? "思考中…" : `生成回覆中…（${sec} 秒）`;
+    }, 2000);
     const hits = resolveRagHits(text);
     const ragContext = formatContext(hits, ragContextLimits());
     const refs = formatRefs(hits);
@@ -469,6 +466,7 @@ async function sendMessage(text) {
       "error",
     );
   } finally {
+    if (typingTick) clearInterval(typingTick);
     busy = false;
     if (els.send) els.send.disabled = false;
     els.commandCenter?.classList.remove("is-thinking");
