@@ -20,7 +20,7 @@ powershell -ExecutionPolicy Bypass -File scripts/setup_chat_api.ps1
 
 或手動：
 3. **Settings → Secrets → Actions**：
-   - `CHAT_API_URL` — Worker 完整 URL（例 `https://em-lab-pi-chat.workers.dev/v1/chat`）
+   - `CHAT_API_URL` — Worker 完整 URL（例 `https://em-lab-pi-chat.b95901149.workers.dev/v1/chat`）
    - `TURNSTILE_SITE_KEY`（可選）
 4. Push 到 `main` 觸發 `.github/workflows/deploy-pages.yml`
 

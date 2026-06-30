@@ -17,9 +17,10 @@ $Python = if ($env:PYTHON) { $env:PYTHON } else { "C:\ProgramData\anaconda3\pyth
 
 function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 
-$WorkerUrl = "https://$WorkerName.workers.dev/v1/chat"
-$HealthUrl = "https://$WorkerName.workers.dev/health"
-
+$WorkersSubdomain = "b95901149"
+$WorkerBase = "https://$WorkerName.$WorkersSubdomain.workers.dev"
+$WorkerUrl = "$WorkerBase/v1/chat"
+$HealthUrl = "$WorkerBase/health"
 Write-Step "Worker URL: $WorkerUrl"
 
 if (-not $SkipDeploy) {
