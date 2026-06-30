@@ -12,10 +12,17 @@ C:\ProgramData\anaconda3\python.exe scripts/serve_docs.py --port 8769
 ## GitHub Pages
 
 1. Repo **Settings → Pages → Source: GitHub Actions**
-2. Push 到 `main` 觸發 `.github/workflows/deploy-pages.yml`
+2. 一鍵設定 API（推薦）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup_chat_api.ps1
+```
+
+或手動：
 3. **Settings → Secrets → Actions**：
-   - `CHAT_API_URL` — Worker 完整 URL（必填，例 `https://em-lab-pi-chat.xxx.workers.dev/v1/chat`）
+   - `CHAT_API_URL` — Worker 完整 URL（例 `https://em-lab-pi-chat.workers.dev/v1/chat`）
    - `TURNSTILE_SITE_KEY`（可選）
+4. Push 到 `main` 觸發 `.github/workflows/deploy-pages.yml`
 
 **注意**：正式站已關閉 RAG 檢索（`--no-rag`），以控制 API token 用量。
 
