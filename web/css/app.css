@@ -19,6 +19,7 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   --topbar-h: 58px;
   --side-w: clamp(300px, 28vw, 380px);
+  --zordon-size: 260px;
 }
 
 * {
@@ -412,21 +413,50 @@ body::before {
   right: 0;
   width: var(--side-w);
   height: calc(100dvh - var(--topbar-h));
+  max-height: calc(100dvh - var(--topbar-h));
   z-index: 10;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   background: var(--surface);
   border-left: 1px solid var(--border);
-  padding: 0 0 1rem;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
+}
+
+.side-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  padding: 0 0 1rem;
+}
+
+.side-panel-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.side-panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.side-panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
 .side-panel .panel-section,
 .side-panel .footer-note {
   margin-left: 1rem;
   margin-right: 1rem;
+}
+
+.side-panel-scroll > .command-center {
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .side-panel.sansha-on {
@@ -614,11 +644,12 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 1rem 0.75rem 0.75rem;
+  padding: 0.75rem 0.75rem 0.65rem;
   margin-bottom: 0.5rem;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   width: 100%;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -661,9 +692,11 @@ body::before {
 
 .zordon-frame {
   position: relative;
-  width: 100%;
+  width: min(100%, var(--zordon-size, 260px));
   max-width: 100%;
+  height: auto;
   aspect-ratio: 1;
+  max-height: min(36dvh, 260px, calc(var(--side-w) - 1.5rem));
   border-radius: 14px;
   overflow: hidden;
   box-shadow:
@@ -675,9 +708,10 @@ body::before {
 .zordon-scene {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center top;
+  object-fit: contain;
+  object-position: center center;
   display: block;
+  background: #0a0e14;
 }
 
 .tube-overlay {
@@ -848,7 +882,7 @@ body::before {
 
 @keyframes floatBob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-3px); }
 }
 
 @keyframes beamPulse {
@@ -920,12 +954,24 @@ body::before {
 @media (max-width: 1280px) {
   :root {
     --side-w: clamp(280px, 26vw, 340px);
+    --zordon-size: 240px;
   }
 }
 
 @media (max-width: 1100px) {
   :root {
     --side-w: clamp(260px, 24vw, 300px);
+    --zordon-size: 220px;
+  }
+}
+
+@media (max-height: 820px) {
+  :root {
+    --zordon-size: 200px;
+  }
+
+  .zordon-frame {
+    max-height: min(30dvh, 200px);
   }
 }
 
@@ -938,6 +984,7 @@ body::before {
     top: 0;
     width: min(320px, 90vw);
     height: 100dvh;
+    max-height: 100dvh;
     z-index: 50;
     transform: translateX(100%);
     transition: transform 0.25s ease;
