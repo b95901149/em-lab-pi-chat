@@ -110,6 +110,7 @@ def write_config(
         "minRequestIntervalMs": 2500 if use_lite_rag else 0,
         "apiMaxRetries": 3 if use_lite_rag else 2,
         "apiBackoffBaseMs": 1500 if use_lite_rag else 1000,
+        "apiRequestTimeoutMs": 180000,
         "liteMode": lite,
         "ragEnabled": rag_enabled,
         "disclaimer": "我以公開教學與研究風格和你聊，基於公開資訊推斷，非本人。",

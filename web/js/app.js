@@ -148,6 +148,7 @@ async function fetchChatWithBackoff(apiUrl, body) {
   const maxRetries = config.apiMaxRetries ?? 2;
   const baseMs = config.apiBackoffBaseMs ?? 1000;
   const minGap = config.minRequestIntervalMs ?? 0;
+  const requestTimeoutMs = config.apiRequestTimeoutMs ?? 180000;
   const now = Date.now();
 
   if (now < backoffUntil) {
@@ -161,7 +162,7 @@ async function fetchChatWithBackoff(apiUrl, body) {
   let lastError = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     lastRequestAt = Date.now();
-    const res = await fetchWithTimeout(apiUrl, 120000, {
+    const res = await fetchWithTimeout(apiUrl, requestTimeoutMs, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -296,8 +297,11 @@ function friendlyApiError(message = "", { retryAfterSeconds = null } = {}) {
   if (/Failed to fetch|NetworkError|Load failed|fetch/i.test(m)) {
     return "⚠ 無法連線到 API。請確認 Worker 已啟動（wrangler dev --port 8787），並用 http://127.0.0.1:8769/ 開啟。";
   }
-  if (/AbortError|逾時|timeout/i.test(m)) {
-    return "⚠ 請求逾時，請稍後再試。";
+  if (/AbortError|TimeoutError|signal timed out|逾時|timeout/i.test(m)) {
+    return (
+      "⚠ 請求逾時（模型回覆較久，或剛觸發 Groq 速率限制）。\n" +
+      "請稍後再試，或將問題拆短一些。"
+    );
   }
   if (/invalid api key|unauthorized|authentication|金鑰無效|GROQ_API_KEY/i.test(m)) {
     return (
@@ -456,7 +460,9 @@ async function sendMessage(text) {
   } catch (err) {
     typing?.remove();
     const msg =
-      err?.name === "AbortError" ? "請求逾時" : err.message || String(err);
+      err?.name === "AbortError" || err?.name === "TimeoutError"
+        ? "請求逾時"
+        : err.message || String(err);
     appendMessage(
       "assistant",
       friendlyApiError(msg, { retryAfterSeconds: err?.retryAfterSeconds }),

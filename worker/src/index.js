@@ -126,7 +126,6 @@ function checkProviderConfig(env, provider) {
 
 async function callLlmWithRetry(body, env, provider, maxRetries = 3) {
   let delay = 600;
-  let lastRetryAfter = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await callLlm(body, env, provider);
@@ -134,16 +133,10 @@ async function callLlmWithRetry(body, env, provider, maxRetries = 3) {
       const isRate =
         err.status === 429 ||
         /429|rate limit|TooManyRequests|tokens per minute/i.test(err.message || "");
-      if (err.retryAfterSeconds != null) {
-        lastRetryAfter = Math.max(lastRetryAfter || 0, err.retryAfterSeconds);
-      }
-      if (!isRate || attempt === maxRetries) {
-        if (lastRetryAfter != null) err.retryAfterSeconds = lastRetryAfter;
-        throw err;
-      }
-      const waitMs =
-        err.retryAfterSeconds != null ? err.retryAfterSeconds * 1000 : delay;
-      await sleep(waitMs);
+      // 429：立即回傳等待秒數，避免 Worker 在後台重試導致前端逾時
+      if (isRate) throw err;
+      if (attempt === maxRetries) throw err;
+      await sleep(delay);
       delay = Math.min(delay * 2, 8000);
     }
   }
