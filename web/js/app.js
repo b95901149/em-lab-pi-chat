@@ -299,6 +299,14 @@ function friendlyApiError(message = "", { retryAfterSeconds = null } = {}) {
   if (/AbortError|逾時|timeout/i.test(m)) {
     return "⚠ 請求逾時，請稍後再試。";
   }
+  if (/invalid api key|unauthorized|authentication|金鑰無效|GROQ_API_KEY/i.test(m)) {
+    return (
+      "⚠ Groq API 金鑰無效或已撤銷。\n" +
+      "請到 https://console.groq.com/keys 建立新金鑰，\n" +
+      "更新 worker/.dev.vars 後執行：\n" +
+      "C:\\ProgramData\\anaconda3\\python.exe scripts\\sync_groq_secret.py"
+    );
+  }
   if (/429|quota|TooManyRequests|配額|rate limit|速率限制|tokens per minute/i.test(m)) {
     if (waitSec) {
       return (

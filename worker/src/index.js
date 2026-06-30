@@ -78,7 +78,9 @@ export default {
       console.error(err);
       const msg = err.message || "Internal error";
       const isQuota = err.status === 429 || /429|quota|TooManyRequests|rate limit/i.test(msg);
-      const status = isQuota ? 429 : 500;
+      const isAuth =
+        err.status === 401 || /invalid api key|unauthorized|authentication/i.test(msg);
+      const status = isQuota ? 429 : isAuth ? 401 : 500;
       const label = provider === "groq" ? "Groq" : "Gemini";
       const retryAfterSeconds =
         err.retryAfterSeconds ?? parseRetryAfterSeconds(null, msg) ?? undefined;
@@ -89,7 +91,13 @@ export default {
               : `${label} 免費配額已用完或觸發速率限制，請稍後再試。`,
             ...(retryAfterSeconds != null ? { retryAfterSeconds } : {}),
           }
-        : { error: msg };
+        : isAuth
+          ? {
+              error:
+                err.message ||
+                `${label} API 金鑰無效。請更新 Worker 上的 GROQ_API_KEY。`,
+            }
+          : { error: msg };
       return cors(json(body, status));
     }
   },
@@ -184,6 +192,11 @@ async function callGroq(body, env) {
   if (!res.ok) {
     const msg = data?.error?.message || JSON.stringify(data);
     const err = new Error(msg);
+    if (res.status === 401 || /invalid api key/i.test(msg)) {
+      err.status = 401;
+      err.message =
+        "Groq API 金鑰無效或已撤銷。請到 console.groq.com 建立新金鑰，並執行 scripts/sync_groq_secret.py";
+    }
     if (res.status === 429) {
       err.status = 429;
       err.retryAfterSeconds = parseRetryAfterSeconds(res, msg);
