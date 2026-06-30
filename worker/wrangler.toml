@@ -1,0 +1,22 @@
+name = "em-lab-pi-chat"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# Deploy: npx wrangler deploy
+# Secrets:
+#   npx wrangler secret put GROQ_API_KEY
+#   npx wrangler secret put GEMINI_API_KEY   # optional, if LLM_PROVIDER=gemini
+#   npx wrangler secret put TURNSTILE_SECRET_KEY  # optional
+
+[vars]
+LLM_PROVIDER = "groq"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GEMINI_MODEL = "gemini-2.0-flash-lite"
+ALLOWED_ORIGINS = ""
+DAILY_IP_LIMIT = "30"
+GLOBAL_DAILY_LIMIT = "800"
+
+[[kv_namespaces]]
+binding = "RATE_KV"
+id = "00000000000000000000000000000001"
+preview_id = "00000000000000000000000000000001"

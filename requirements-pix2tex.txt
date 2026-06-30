@@ -1,0 +1,7 @@
+# Isolated env for board OCR -> LaTeX (pix2tex). Install via setup_pix2tex_env.ps1
+numpy>=1.24,<2
+pillow>=10.0
+opencv-python>=4.8
+torch>=2.0
+torchvision>=0.15
+pix2tex>=0.1.2

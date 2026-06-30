@@ -1,0 +1,29 @@
+# Internal skill corpus (not needed for Pages; keep local only)
+/references/
+SKILL.md
+_test_link.pdf
+
+# Build output (CI regenerates docs/ for GitHub Pages)
+/docs/rag/
+/docs/assets/
+/docs/config.json
+/docs/index.html
+/docs/css/
+/docs/js/
+
+# Secrets & local env
+worker/.dev.vars
+worker/node_modules/
+worker/.wrangler/
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
